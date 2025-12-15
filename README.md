@@ -39,7 +39,7 @@ A Spring Boot-based service for orchestrating and auditing secure data transfers
 
 ### Prerequisites
 
-- Java 17+
+- Java 21+
 - Maven 3.8+
 - PostgreSQL (or use H2 for testing)
 

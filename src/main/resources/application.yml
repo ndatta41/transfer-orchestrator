@@ -50,8 +50,6 @@ logging:
   level:
     root: INFO
     com.company: DEBUG
-  file:
-    name: app.log
 
 springdoc:
   api-docs:

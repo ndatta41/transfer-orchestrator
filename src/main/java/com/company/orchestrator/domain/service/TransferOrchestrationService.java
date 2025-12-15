@@ -1,6 +1,7 @@
 package com.company.orchestrator.domain.service;
 
 import com.company.orchestrator.api.controller.DemoPolicies;
+import com.company.orchestrator.api.dto.TransferAnalyticsResponse;
 import com.company.orchestrator.api.dto.TransferRequestDto;
 import com.company.orchestrator.api.dto.TransferSummaryResponse;
 import com.company.orchestrator.domain.exception.TransferNotFoundException;
@@ -9,8 +10,10 @@ import com.company.orchestrator.domain.model.*;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import com.company.orchestrator.infrastructure.edc.EdcConnectorClient;
 import com.company.orchestrator.infrastructure.edc.dto.ContractNegotiationRequest;
@@ -162,4 +165,38 @@ public class TransferOrchestrationService
                         entity.getCreatedAt()
                 ));
     }
+
+    @Override
+    public TransferAnalyticsResponse getAnalytics() {
+
+        long total = repository.count();
+
+        Map<String, Long> byState =
+                repository.countByState().stream()
+                        .collect(Collectors.toMap(
+                                row -> row[0].toString(),
+                                row -> (Long) row[1]
+                        ));
+
+        Map<String, Long> byDataType =
+                repository.countByDataType().stream()
+                        .collect(Collectors.toMap(
+                                row -> row[0].toString(),
+                                row -> (Long) row[1]
+                        ));
+
+        return new TransferAnalyticsResponse(
+                total,
+                byState,
+                byDataType
+        );
+    }
+
+
+
+
+
+
+
+
 }

@@ -97,4 +97,10 @@ public class TransferController {
 
         return orchestrator.listTransfers(pageable);
     }
+
+    @GetMapping("/analytics")
+    @Operation(summary = "Transfer analytics")
+    public TransferAnalyticsResponse getTransferAnalytics() {
+        return orchestrator.getAnalytics();
+    }
 }

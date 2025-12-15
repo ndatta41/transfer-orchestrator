@@ -2,9 +2,12 @@ package com.company.orchestrator.infrastructure.persistence.entity;
 
 import com.company.orchestrator.audit.AuditAction;
 import jakarta.persistence.*;
+import lombok.Getter;
+
 import java.time.Instant;
 import java.util.UUID;
 
+@Getter
 @Entity
 @Table(name = "audit_events",
         indexes = {

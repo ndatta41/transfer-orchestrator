@@ -1,9 +1,15 @@
 package com.company.orchestrator.domain.service;
 
+import com.company.orchestrator.api.controller.DemoPolicies;
+import com.company.orchestrator.api.dto.TransferRequestDto;
+import com.company.orchestrator.api.dto.TransferSummaryResponse;
 import com.company.orchestrator.domain.exception.TransferNotFoundException;
 import com.company.orchestrator.domain.model.*;
 
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import com.company.orchestrator.infrastructure.edc.EdcConnectorClient;
@@ -14,7 +20,11 @@ import com.company.orchestrator.infrastructure.edc.dto.DataTransferResult;
 import com.company.orchestrator.infrastructure.persistence.entity.AuditEventEntity;
 import com.company.orchestrator.infrastructure.persistence.entity.TransferEntity;
 import com.company.orchestrator.infrastructure.persistence.repository.TransferRepository;
+import com.company.orchestrator.policy.Policy;
+import com.company.orchestrator.policy.PolicyContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,11 +52,33 @@ public class TransferOrchestrationService
     }
 
     @Override
-    public UUID initiateTransfer(TransferRequest request) {
+    public UUID initiateTransfer(TransferRequestDto dto) {
+        Policy policy = DemoPolicies.defaultPolicy();
+
+        PolicyContext context = new PolicyContext(
+                dto.consumerId(),
+                dto.providerId(),
+                dto.dataType(),
+                "EU",
+                Set.of("ISO_9001"),
+                "QUALITY_ANALYSIS",
+                Instant.now(),
+                ZoneId.of("CET"),
+                10
+        );
         TransferEntity entity =  new TransferEntity(
-                request.consumerId(),
-                request.providerId(),
-                request.dataType()
+                dto.consumerId(),
+                dto.providerId(),
+                dto.dataType()
+        );
+        entity = repository.save(entity);
+        TransferRequest request = new TransferRequest(
+                entity.getId(),
+                dto.consumerId(),
+                dto.providerId(),
+                dto.dataType(),
+                policy,
+                context
         );
         auditService.logTransferRequest(request);
         entity.setState(TransferState.POLICY_EVALUATION);
@@ -63,7 +95,6 @@ public class TransferOrchestrationService
             return entity.getId();
         }
         entity.setState(TransferState.APPROVED);
-        entity = repository.save(entity);
         // EDC steps handled in infrastructure layer
         auditService.logStateTransition(entity.getId(), entity.getState(), TransferState.CONTRACT_NEGOTIATION);
         ContractNegotiationResult contractNegotiationResult = edcConnectorClient.negotiateContract(new ContractNegotiationRequest(request.consumerId(), request.providerId(), request.dataType()));
@@ -84,6 +115,7 @@ public class TransferOrchestrationService
             auditService.logStateTransition(entity.getId(), entity.getState(), TransferState.FAILED);
             entity.setState(TransferState.FAILED);
         }
+        entity = repository.save(entity);
         return entity.getId();
     }
 
@@ -114,8 +146,20 @@ public class TransferOrchestrationService
     }
 
     @Override
-    public List<AuditEventEntity>
-    getTransferAuditLog(UUID transferId) {
+    public List<AuditEventEntity> getTransferAuditLog(UUID transferId) {
         return auditService.getAuditTrail(transferId);
+    }
+
+    @Override
+    public Page<TransferSummaryResponse> listTransfers(Pageable pageable) {
+        return repository.findAll(pageable)
+                .map(entity -> new TransferSummaryResponse(
+                        entity.getId(),
+                        entity.getConsumerId(),
+                        entity.getProviderId(),
+                        entity.getDataType(),
+                        entity.getState().name(),
+                        entity.getCreatedAt()
+                ));
     }
 }

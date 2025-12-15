@@ -5,7 +5,7 @@ public record ContractNegotiationResult(
         String contractAgreementId,
         String errorMessage
 ) {
-    public static ContractNegotiationResult success(String id) {
+    public static ContractNegotiationResult ok(String id) {
         return new ContractNegotiationResult(true, id, null);
     }
 

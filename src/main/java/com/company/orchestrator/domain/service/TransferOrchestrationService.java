@@ -6,6 +6,11 @@ import com.company.orchestrator.domain.model.*;
 import java.util.List;
 import java.util.UUID;
 
+import com.company.orchestrator.infrastructure.edc.EdcConnectorClient;
+import com.company.orchestrator.infrastructure.edc.dto.ContractNegotiationRequest;
+import com.company.orchestrator.infrastructure.edc.dto.ContractNegotiationResult;
+import com.company.orchestrator.infrastructure.edc.dto.DataTransferRequest;
+import com.company.orchestrator.infrastructure.edc.dto.DataTransferResult;
 import com.company.orchestrator.infrastructure.persistence.entity.AuditEventEntity;
 import com.company.orchestrator.infrastructure.persistence.entity.TransferEntity;
 import com.company.orchestrator.infrastructure.persistence.repository.TransferRepository;
@@ -22,15 +27,18 @@ public class TransferOrchestrationService
     private final TransferRepository repository;
     private final PolicyEvaluationService policyService;
     private final AuditService auditService;
+    private final EdcConnectorClient edcConnectorClient;
 
     public TransferOrchestrationService(
             TransferRepository repository,
             PolicyEvaluationService policyService,
-            AuditService auditService
+            AuditService auditService,
+            EdcConnectorClient edcConnectorClient
     ) {
         this.repository = repository;
         this.policyService = policyService;
         this.auditService = auditService;
+        this.edcConnectorClient = edcConnectorClient;
     }
 
     @Override
@@ -57,6 +65,25 @@ public class TransferOrchestrationService
         entity.setState(TransferState.APPROVED);
         entity = repository.save(entity);
         // EDC steps handled in infrastructure layer
+        auditService.logStateTransition(entity.getId(), entity.getState(), TransferState.CONTRACT_NEGOTIATION);
+        ContractNegotiationResult contractNegotiationResult = edcConnectorClient.negotiateContract(new ContractNegotiationRequest(request.consumerId(), request.providerId(), request.dataType()));
+        entity.setState(TransferState.NEGOTIATED);
+        auditService.logStateTransition(entity.getId(), TransferState.CONTRACT_NEGOTIATION, TransferState.NEGOTIATED);
+        auditService.logStateTransition(entity.getId(), entity.getState(), TransferState.TRANSFER_IN_PROGRESS);
+        DataTransferResult dataTransferResult = edcConnectorClient.initiateTransfer(
+                new DataTransferRequest(
+                        contractNegotiationResult.contractAgreementId(),
+                        UUID.randomUUID().toString(),
+                        UUID.randomUUID().toString())
+        );
+        entity.setState(TransferState.TRANSFER_IN_PROGRESS);
+        if(dataTransferResult.success()){
+            auditService.logStateTransition(entity.getId(), entity.getState(), TransferState.COMPLETED);
+            entity.setState(TransferState.COMPLETED);
+        } else {
+            auditService.logStateTransition(entity.getId(), entity.getState(), TransferState.FAILED);
+            entity.setState(TransferState.FAILED);
+        }
         return entity.getId();
     }
 

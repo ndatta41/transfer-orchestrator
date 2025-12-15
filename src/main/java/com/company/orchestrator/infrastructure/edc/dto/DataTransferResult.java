@@ -5,7 +5,7 @@ public record DataTransferResult(
         String transferProcessId,
         String errorMessage
 ) {
-    public static DataTransferResult success(String id) {
+    public static DataTransferResult ok(String id) {
         return new DataTransferResult(true, id, null);
     }
 

@@ -39,8 +39,6 @@ public class TransferController {
     ) {
 
         UUID id = orchestrator.initiateTransfer(dto);
-        log.info("got response: {}", id);
-
         return ResponseEntity.ok(new TransferResponseDto(id));
     }
 
